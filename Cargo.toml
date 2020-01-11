@@ -1,0 +1,8 @@
+[package]
+name = "arinc-429"
+version = "0.1.0"
+authors = ["AeroRust Working Group"]
+edition = "2018"
+
+[dependencies]
+nom = { version = "5.1" }
