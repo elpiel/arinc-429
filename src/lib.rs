@@ -1,10 +1,10 @@
 use nom::{IResult, bytes::streaming::take};
 
-fn parse_word(i: &[u8]) -> IResult<&[u8], &[u8]> {
+pub fn parse_word(i: &[u8]) -> IResult<&[u8], &[u8]> {
     take(4usize)(i)
 }
 
-fn is_word_correct(i: &[u8; 4]) -> bool {
+pub fn is_word_correct(i: &[u8; 4]) -> bool {
     // "odd" parity - there must be an odd number of "1" bits in the word
     i.iter().fold(0, |acc, byte| acc + byte.count_ones()) % 2 != 0
 }
@@ -18,36 +18,64 @@ fn take_byte(i: &[u8]) -> IResult<&[u8], u8> {
 
 pub type Label = u8;
 
-fn parse_label(i: &[u8]) -> IResult<&[u8], Label> {
+pub fn parse_label(i: &[u8]) -> IResult<&[u8], Label> {
     take_byte(i)
 }
 
 /// Source/Destination Identifiers
+#[derive(Debug, PartialEq, Eq)]
 pub enum SDI {
     First, // 00
     Second, // 01
     Third, // 10
-    Forth, // 11
+    Fourth, // 11
+}
+
+pub fn bits_pair(i: (&[u8], usize)) ->  IResult<(&[u8], usize), u8> {
+    nom::bits::complete::take(2_u8)(i)
 }
 
 pub fn parse_sdi(i: &[u8]) -> IResult<&[u8], SDI> {
-    use nom::combinator::map_res;
-    use nom::bytes::complete::take as take_bytes;
-    use nom::bits::{bits, complete::take};
+    use nom::combinator::map;
+    use nom::bits::bits;
 
-    let byte = take_byte(i);
-
-    let bits = bits::<_, _, _>(take::<_, u8, _, (_, _)>(2_usize))(i);
-
-    dbg!(bits);
-
-    Ok((i, SDI::First))
+    // @TODO: Fix this! We should collect the other bits, or they will be thrown away
+    map(bits(bits_pair), |sdi_num: u8| {
+        match sdi_num {
+            0 => SDI::First,
+            1 => SDI::Second,
+            2 => SDI::Third,
+            3 => SDI::Fourth,
+            _ => unreachable!("Unreachable! We only get 2 bits.."),
+        }
+    })(i)
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parsing_sdi() {
+        let expected_results: Vec<(SDI, u8)> = vec![
+            // 00
+            (SDI::First, 0b00_111111),
+            // 01
+            (SDI::Second, 0b01_111111),
+            // 10
+            (SDI::Third, 0b10_111111),
+             //11
+            (SDI::Fourth, 0b11_111111),
+        ];
+        
+        for (expected, value) in expected_results {
+            let input = [value];
+            let actual = parse_sdi(&input).expect("Should succeed");
+            dbg!(actual.0);
+
+            assert_eq!(actual.1, expected);
+        }
+    }
 
     #[test]
     fn parsing_label() {
